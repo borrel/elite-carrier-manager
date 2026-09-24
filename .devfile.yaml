@@ -15,6 +15,8 @@ components:
   # The unified environment runtime block containing the Python stack tools
   - name: python-runtime
     container:
+      image: ://redhat.com
+      memoryLimit: 1Gi
       mountSources: true
       endpoints:
         - name: flask-web
