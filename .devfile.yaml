@@ -1,0 +1,53 @@
+schemaVersion: 2.2.0
+metadata:
+  name: elite-carrier-manager
+  version: 1.0.0
+  description: "Dev Spaces environment for Fleet Carrier Upkeep Hub"
+  tags: ["Python", "Flask", "SQLite", "OpenShift"]
+
+projects:
+  - name: elite-carrier-manager
+    git:
+      remotes:
+        origin: "https://github.com"
+
+components:
+  # The unified environment runtime block containing the Python stack tools
+  - name: python-runtime
+    container:
+      mountSources: true
+      endpoints:
+        - name: flask-web
+          targetPort: 5000
+          exposure: public
+          protocol: http
+          secure: true
+
+commands:
+  # Task 1: Environment Initialization & Package Provisioning
+  - id: install-dependencies
+    exec:
+      component: python-runtime
+      commandLine: "pip install --user -r requirements.txt"
+      workingDir: ${PROJECT_SOURCE}
+      group:
+        kind: build
+        isDefault: true
+
+  # Task 2: Boot up the interactive Flask Web Dashboard interface
+  - id: start-web-dashboard
+    exec:
+      component: python-runtime
+      commandLine: "python app.py"
+      workingDir: ${PROJECT_SOURCE}
+      group:
+        kind: run
+
+  # Task 3: Boot up the asynchronous Wednesday Token-Refreshing Chronos engine
+  - id: start-background-scheduler
+    exec:
+      component: python-runtime
+      commandLine: "python scheduler.py"
+      workingDir: ${PROJECT_SOURCE}
+      group:
+        kind: run
