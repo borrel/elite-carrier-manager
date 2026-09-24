@@ -13,7 +13,7 @@ projects:
 
 components:
   # The unified environment runtime block containing the Python stack tools
-  - name: python-runtime
+  - name: py
     container:
       image: registry.access.redhat.com/ubi9/python-39:1-1789345358
       args: ['tail', '-f', '/dev/null']
