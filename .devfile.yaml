@@ -9,20 +9,6 @@ metadata:
   attributes:
     alpha.dockerimage-port: 3001
   icon: https://raw.githubusercontent.com/devfile-samples/devfile-stack-icons/main/node-js.svg
-  tags:
-    - Node.js
-    - Express
-    - ubi8
-  projectType: Node.js
-  language: JavaScript
-  version: 2.2.1
-starterProjects:
-  - name: nodejs-starter
-    git:
-      checkoutFrom:
-        revision: main
-      remotes:
-        origin: 'https://github.com/nodeshift-starters/devfile-sample.git'
 components:
   - name: runtime
     container:
