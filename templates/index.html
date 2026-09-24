@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Dangerous: Fleet Carrier Dash</title>
+    <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <!-- Header Navigation -->
+    <nav class="border-b border-slate-800 bg-slate-950 p-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <span class="text-amber-500 text-2xl font-bold tracking-wider">🚀 CMDR DASHBOARD</span>
+            <div id="auth-status">
+                <a href="/login" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold px-4 py-2 rounded transition shadow-lg shadow-amber-600/20">
+                    Connect Frontier Account
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+        
+        <!-- Alerts Block -->
+        <div id="alert-banner" class="hidden p-4 rounded-lg border flex items-center space-x-3">
+            <div class="text-2xl" id="alert-icon">⚠️</div>
+            <div>
+                <h3 class="font-bold tracking-wide" id="alert-title">System Status</h3>
+                <p class="text-sm text-slate-300" id="alert-text">Loading configuration framework...</p>
+            </div>
+        </div>
+
+        <!-- System Controls Matrix -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6 md:col-span-2 flex flex-col justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold">Carrier Tracking Identifier</p>
+                    <h1 id="carrier-name" class="text-3xl font-extrabold text-amber-400 tracking-tight mt-1">No Carrier Linked</h1>
+                </div>
+                <div class="mt-4 flex items-center space-x-4">
+                    <div class="bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+                        <span class="text-xs text-slate-500 uppercase font-mono block">Callsign</span>
+                        <span id="carrier-callsign" class="font-mono font-bold text-slate-300">------</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Alert Configuration System Selector -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+                <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Notification Threshold</h3>
+                <form id="config-form" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">Alert Runway Warning Limit (Weeks)</label>
+                        <input type="number" id="input-threshold" min="1" max="52" value="4" 
+                               class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-amber-400 font-mono focus:outline-none focus:border-amber-500">
+                    </div>
+                    <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-xs font-bold uppercase tracking-wider py-2 rounded transition border border-slate-700">
+                        Save System Configuration
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+                <p class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">Carrier Bank Balance</p>
+                <p id="stat-balance" class="text-2xl font-mono font-bold text-emerald-400">0 CR</p>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+                <p class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">Weekly Operational Cost</p>
+                <p id="stat-upkeep" class="text-2xl font-mono font-bold text-rose-400">0 CR</p>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+                <p class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">Estimated Runway</p>
+                <p id="stat-runway" class="text-2xl font-mono font-bold text-blue-400">0 Weeks</p>
+            </div>
+        </div>
+
+        <!-- Modules Grid -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+            <h2 class="text-lg font-bold tracking-wide border-b border-slate-800 pb-3 mb-4">Carrier Module Array Matrix</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="modules-container">
+                <p class="text-slate-500 text-sm">Please authenticate with Frontier to stream your system telemetry.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Load configuration settings straight from storage file context
+            async function syncDashboardData() {
+                try {
+                    const res = await fetch('/upkeep');
+                    if (res.status === 401 || res.redirected) return;
+                    
+                    const data = await res.json();
+                    
+                    document.getElementById('auth-status').innerHTML = `
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">● Synchronized</span>`;
+
+                    document.getElementById('carrier-name').innerText = data.carrier_name;
+                    document.getElementById('carrier-callsign').innerText = data.callsign;
+                    document.getElementById('stat-balance').innerText = data.carrier_bank_balance.toLocaleString() + " CR";
+                    document.getElementById('stat-upkeep').innerText = data.calculated_weekly_upkeep.toLocaleString() + " CR";
+                    document.getElementById('stat-runway').innerText = data.weeks_remaining_until_debt + " Weeks";
+                    document.getElementById('input-threshold').value = data.user_configured_threshold;
+
+                    const banner = document.getElementById('alert-banner');
+                    banner.classList.remove('hidden');
+
+                    if (data.alert_tier === "HEALTHY") {
+                        banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-emerald-950/30 border-emerald-800 text-emerald-400";
+                        document.getElementById('alert-title').innerText = "System Matrix Secure";
+                        document.getElementById('alert-icon').innerText = "🛡️";
+                    } else if (data.alert_tier === "LOW_FUNDS_ALERT") {
+                        banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-amber-950/30 border-amber-800 text-amber-400";
+                        document.getElementById('alert-title').innerText = "Low Reserve Warning";
+                        document.getElementById('alert-icon').innerText = "⚠️";
+                    } else {
+                        banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-rose-950/30 border-rose-800 text-rose-400 animate-pulse";
+                        document.getElementById('alert-title').innerText = "CRITICAL DECOMMISSIONING HAZARD";
+                        document.getElementById('alert-icon').innerText = "🚨";
+                    }
+                    document.getElementById('alert-text').innerText = data.alert_details;
+
+                    const container = document.getElementById('modules-container');
+                    container.innerHTML = "";
+                    Object.entries(data.modules_status).forEach(([name, meta]) => {
+                        let badgeClass = meta.state === "enabled" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                                         meta.state === "disabled" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : 
+                                         "bg-slate-800 text-slate-500 border-slate-700";
+
+                        container.innerHTML += `
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-slate-900 border border-slate-800">
+                                <span class="capitalize font-medium text-slate-300">${name}</span>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${badgeClass}">${meta.state}</span>
+                                    <span class="text-xs font-mono text-slate-500">${meta.cost_cr.toLocaleString()} CR/wk</span>
+                                </div>
+                            </div>`;
+                    });
+                } catch (err) { console.error(err); }
+            }
+
+            // Handle configuration post back to the server setup engine
+            document.getElementById('config-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const targetWeeks = document.getElementById('input-threshold').value;
+                await fetch('/save-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ threshold_weeks: parseInt(targetWeeks) })
+                });
+                alert("Configuration framework updated successfully!");
+                syncDashboardData();
+            });
+
+            syncDashboardData();
+        });
+    </script>
+</body>
+</html>

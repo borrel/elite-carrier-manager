@@ -9,7 +9,7 @@ projects:
   - name: elite-carrier-manager
     git:
       remotes:
-        origin: "https://github.com"
+        origin: "https://github.com/borrel/elite-carrier-manager/"
 
 components:
   # The unified environment runtime block containing the Python stack tools
@@ -30,7 +30,7 @@ components:
           value: '5858'
 
 commands:
-- name: build
+  - name: build
     image:
       imageName: python-image:latest
       dockerfile:
