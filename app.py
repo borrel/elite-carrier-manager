@@ -11,20 +11,25 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")
 
 CLIENT_ID = os.getenv("FRONTIER_CLIENT_ID")
 CLIENT_SECRET = os.getenv("FRONTIER_CLIENT_SECRET")
-TOKEN_URL = "https://frontierstore.net"
-CAPI_URL = "https://orerve.net"
-REDIRECT_URI = "http://localhost:5000/callback"
+TOKEN_URL = "https://auth.frontierstore.net"
+CAPI_URL = "https://companion.orerve.net"
+REDIRECT_URI = "https://localhost/callback"
 HEADERS = {"User-Agent": "EDCD-CarrierUpkeepAlertManager-1.0.0"}
 DB_FILE = "carrier_data.db"
 
 CORE_CARRIER_UPKEEP = 5000000
 MODULE_COSTS = {
-    "refuel": {"enabled": 5000000, "disabled": 1500000, "not-installed": 0},
-    "repair": {"enabled": 5000000, "disabled": 1500000, "not-installed": 0},
-    "armory": {"enabled": 5000000, "disabled": 1500000, "not-installed": 0},
-    "cartographics": {"enabled": 7000000, "disabled": 2500000, "not-installed": 0},
-    "shipyard": {"enabled": 7000000, "disabled": 2500000, "not-installed": 0},
-    "outfitting": {"enabled": 5000000, "disabled": 1500000, "not-installed": 0},
+    "refuel": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "repair": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "rearm": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "cartographics": {"ok": 1850000, "disabled": 700000, "not-installed": 0},
+    "shipyard": {"ok": 6500000, "disabled": 1800000, "not-installed": 0},
+    "outfitting": {"ok": 5000000, "disabled": 1500000, "not-installed": 0},
+    "voucherredemption": {"ok": 1850000, "disabled": 850000, "not-installed": 0},
+    "securetrading": {"ok": 2000000, "disabled": 1250000, "not-installed": 0},
+    "bartender": {"ok": 1750000, "disabled": 1250000, "not-installed": 0},
+    "genommics": {"ok": 1500000, "disabled": 700000, "not-installed": 0},
+    "pioneersupplies": {"ok": 5000000, "disabled": 1500000, "not-installed": 0},
 }
 
 def init_db():
@@ -48,12 +53,12 @@ def index():
 def login():
     params = {
         "audience": "all",
-        "scope": "auth capi text",
+        "scope": "auth capi",
         "response_type": "code",
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI
     }
-    return redirect(f"https://frontierstore.net?{requests.compat.urlencode(params)}")
+    return redirect(f"{TOKEN_URL}/auth?{requests.compat.urlencode(params)}")
 
 @app.route('/callback')
 def callback():
@@ -65,14 +70,16 @@ def callback():
         "redirect_uri": REDIRECT_URI,
         "code": code
     }
-    res = requests.post(TOKEN_URL, data=payload, headers=HEADERS).json()
+    resr = requests.post(f"{TOKEN_URL}/token", data=payload, headers=HEADERS)
+    res = resr.json()
     
     access_token = res.get("access_token")
     refresh_token = res.get("refresh_token")
     
     # Temporarily fetch carrier info to get the unique key (Callsign)
-    capi_res = requests.get(CAPI_URL, headers={**HEADERS, "Authorization": f"Bearer {access_token}"}).json()
-    callsign = capi_res.get("callsign", "UNKNOWN")
+    capi = requests.get(f"{CAPI_URL}/profile", headers={**HEADERS, "Authorization": f"Bearer {access_token}"})
+    capi_res = capi.json()
+    callsign = capi_res.get("commander").get("name")
     
     # Save or update user inside the SQLite database
     with sqlite3.connect(DB_FILE) as conn:
@@ -111,23 +118,26 @@ def calculate_upkeep():
     if not callsign or not token:
         return jsonify({"error": "Unauthorized"}), 401
 
-    res = requests.get(CAPI_URL, headers={**HEADERS, "Authorization": f"Bearer {token}"})
+    res = requests.get(F"{CAPI_URL}/fleetcarrier", headers={**HEADERS, "Authorization": f"Bearer {token}"})
     if res.status_code == 401:
         return jsonify({"error": "Token expired"}), 401
 
     data = res.json()
-    carrier_bank = data.get("balance", 0)
-    services = data.get("state", {}).get("services", {})
+    carrier_bank = int(data.get("balance", 0))
+    services = data.get("servicesCrew", {})
     
     weekly_total = CORE_CARRIER_UPKEEP
     module_summary = {}
 
-    for m, config in services.items():
-        if m in MODULE_COSTS:
-            st = "enabled" if config.get("status") == "active" else "disabled" if config.get("status") == "suspended" else "not-installed"
-            cost = MODULE_COSTS[m][st]
+    for m, c in MODULE_COSTS.items():
+        if m in services:
+            st = services.get(m).get("status")
+            cost = c[st]
             weekly_total += cost
             module_summary[m] = {"state": st, "cost_cr": cost}
+        else:
+            module_summary[m] = {"state": "not-installed", "cost_cr": 0}
+
 
     runway = carrier_bank / weekly_total if weekly_total > 0 else float('inf')
     
@@ -145,7 +155,7 @@ def calculate_upkeep():
         msg = f"DANGER: Balance tracks below your user threshold configuration of {threshold} weeks!"
 
     return jsonify({
-        "carrier_name": data.get("name"), "callsign": callsign,
+        "carrier_name": data.get("name").get("vanityName"), "callsign": callsign,
         "carrier_bank_balance": carrier_bank, "calculated_weekly_upkeep": weekly_total,
         "weeks_remaining_until_debt": round(runway, 1), "alert_tier": alert_tier,
         "alert_details": msg, "modules_status": module_summary,
