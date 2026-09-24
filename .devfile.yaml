@@ -1,70 +1,75 @@
-schemaVersion: 2.2.0
+schemaVersion: 2.2.2
 metadata:
-  name: elite-carrier-manager
+  name: elite-carrier-manager-node
   version: 1.0.0
-  description: "Dev Spaces environment for Fleet Carrier Upkeep Hub"
-  tags: ["Python", "Flask", "SQLite", "OpenShift"]
-
-projects:
-  - name: elite-carrier-manager
+  description: "Dev Spaces Node.js environment for Fleet Carrier Upkeep Hub"
+  tags: ["NodeJS", "Express", "SQLite", "OpenShift"]
+  projectType: "Node.js"
+  language: "JavaScript"
+  attributes:
+    alpha.dockerimage-port: 3001
+  icon: https://raw.githubusercontent.com/devfile-samples/devfile-stack-icons/main/node-js.svg
+  tags:
+    - Node.js
+    - Express
+    - ubi8
+  projectType: Node.js
+  language: JavaScript
+  version: 2.2.1
+starterProjects:
+  - name: nodejs-starter
     git:
+      checkoutFrom:
+        revision: main
       remotes:
-        origin: "https://github.com/borrel/elite-carrier-manager/"
-
+        origin: 'https://github.com/nodeshift-starters/devfile-sample.git'
 components:
-  # The unified environment runtime block containing the Python stack tools
-  - name: py
+  - name: runtime
     container:
-      image: registry.access.redhat.com/ubi9/python-39:1-1789345358
+      image: registry.access.redhat.com/ubi8/nodejs-18:1-32
       args: ['tail', '-f', '/dev/null']
+      memoryLimit: 1024Mi
       mountSources: true
+      env:
+        - name: DEBUG_PORT
+          value: '5858'
       endpoints:
-        - name: https-python
-          targetPort: 8080
+        - name: https-node
+          targetPort: 3000
           protocol: https
         - exposure: none
           name: debug
           targetPort: 5858
-      env:
-        - name: DEBUG_PORT
-          value: '5858'
-
 commands:
-  - id: pip-install-requirements
+  - id: install
     exec:
-      commandLine: pip install -r requirements.txt
+      component: runtime
+      commandLine: npm install
       workingDir: ${PROJECT_SOURCE}
       group:
         kind: build
         isDefault: true
-      component: py
-  - id: run-app
+  - id: run
     exec:
-      commandLine: 'python app.py'
+      component: runtime
+      commandLine: npm start
       workingDir: ${PROJECT_SOURCE}
-      component: py
       group:
         kind: run
         isDefault: true
-  - id: run-scheduler
+  - id: debug
     exec:
-      commandLine: 'python scheduler.py'
+      component: runtime
+      commandLine: npm run debug
       workingDir: ${PROJECT_SOURCE}
-      component: py
-      group:
-        kind: run
-        isDefault: false
-  - id: debug-py-app
-    exec:
-      commandLine: 'pip install debugpy && python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} app.py'
-      workingDir: ${PROJECT_SOURCE}
-      component: py
       group:
         kind: debug
-  - id: debug-py-scheduler
+        isDefault: true
+  - id: test
     exec:
-      commandLine: 'pip install debugpy && python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} scheduler.py'
+      component: runtime
+      commandLine: npm test
       workingDir: ${PROJECT_SOURCE}
-      component: py
       group:
-        kind: debug
+        kind: test
+        isDefault: true

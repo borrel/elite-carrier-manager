@@ -23,6 +23,21 @@
 
     <!-- Main Container -->
     <main class="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+        <!-- NEW: Calendar Decommission Timeline Tracking Bar -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-6">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Decommission Projection Timeline</h3>
+                <span id="timeline-countdown-text" class="text-xs font-mono text-slate-400">Awaiting synchronization...</span>
+            </div>
+            <!-- The Dynamic Visual Timeline Bar Container -->
+            <div id="timeline-bar-wrapper" class="grid grid-cols-6 gap-2 w-full pt-2">
+                <!-- Dynamically populated month blocks inject here -->
+            </div>
+            <div class="flex justify-between items-center mt-3 text-[10px] text-slate-500 uppercase tracking-wider font-semibold px-1">
+                <span>Current Month</span>
+                <span>+6 Months Ahead</span>
+            </div>
+        </div>
         
         <!-- Alerts Block -->
         <div id="alert-banner" class="hidden p-4 rounded-lg border flex items-center space-x-3">
@@ -91,8 +106,76 @@
     </main>
 
     <script>
-        document.addEventListener("DOMContentLoaded", async () => {
-            // Load configuration settings straight from storage file context
+        const 
+MODULE_COSTS = {
+    "refuel": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "repair": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "rearm": {"ok": 1500000, "disabled": 750000, "not-installed": 0},
+    "cartographics": {"ok": 1850000, "disabled": 700000, "not-installed": 0},
+    "shipyard": {"ok": 6500000, "disabled": 1800000, "not-installed": 0},
+    "outfitting": {"ok": 5000000, "disabled": 1500000, "not-installed": 0},
+    "voucherredemption": {"ok": 1850000, "disabled": 850000, "not-installed": 0},
+    "securetrading": {"ok": 2000000, "disabled": 1250000, "not-installed": 0},
+    "bartender": {"ok": 1750000, "disabled": 1250000, "not-installed": 0},
+    "genommics": {"ok": 1500000, "disabled": 700000, "not-installed": 0},
+    "pioneersupplies": {"ok": 5000000, "disabled": 1500000, "not-installed": 0},
+};
+
+
+document.addEventListener("DOMContentLoaded", async () => {
+            
+            function buildCalendarTimeline(weeksRemaining, thresholdWeeks) {
+                const wrapper = document.getElementById('timeline-bar-wrapper');
+                const countdownText = document.getElementById('timeline-countdown-text');
+                wrapper.innerHTML = ""; // Clear existing placeholder components
+                
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const today = new Date();
+                
+                // Map out status colors for the calendar bar
+                // A month is approximated to 4.34 weeks
+                const totalMonthsToRender = 6;
+                const totalDaysRemaining = weeksRemaining * 7;
+                
+                let decommissionDate = new Date();
+                decommissionDate.setDate(today.getDate() + totalDaysRemaining);
+                
+                if (weeksRemaining === Infinity || isNaN(weeksRemaining)) {
+                    countdownText.innerText = "No upcoming risks. Upkeep is 0 CR.";
+                    return;
+                }
+                
+                countdownText.innerHTML = `Estimated Critical Drop: <strong class="text-rose-400 font-mono">${decommissionDate.toLocaleDateString(undefined, {month: 'long', year: 'numeric'})}</strong>`;
+
+                for (let i = 0; i < totalMonthsToRender; i++) {
+                    let targetMonthDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+                    let label = `${monthNames[targetMonthDate.getMonth()]} ${targetMonthDate.getFullYear().toString().substr(-2)}`;
+                    
+                    // Determine how many weeks out this specific rendering month block sits
+                    const weeksOutForThisBlock = i * 4.34;
+                    
+                    let bgStyle = "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"; // Default Safe status
+                    let statusLabel = "Safe";
+                    
+                    if (weeksRemaining <= weeksOutForThisBlock) {
+                        // Funds empty before or during this month zone
+                        bgStyle = "bg-rose-950 border-rose-600 text-rose-400 animate-pulse border-2 shadow-lg shadow-rose-950/50";
+                        statusLabel = "CRITICAL DEBT";
+                    } else if (weeksRemaining <= (weeksOutForThisBlock + thresholdWeeks)) {
+                        // Enters threshold window limits
+                        bgStyle = "bg-amber-500/10 border-amber-500/30 text-amber-400";
+                        statusLabel = "Warning Zone";
+                    }
+                    
+                    wrapper.innerHTML += `
+                        <div class="border rounded-lg p-3 text-center flex flex-col justify-between transition-all ${bgStyle}">
+                            <span class="text-xs font-bold font-mono tracking-tight">${label}</span>
+                            <span class="text-[9px] uppercase tracking-widest font-semibold opacity-70 mt-2 block">${statusLabel}</span>
+                        </div>
+                    `;
+                }
+            }
+
             async function syncDashboardData() {
                 try {
                     const res = await fetch('/upkeep');
@@ -106,62 +189,51 @@
                     document.getElementById('carrier-name').innerText = data.carrier_name;
                     document.getElementById('carrier-callsign').innerText = data.callsign;
                     document.getElementById('stat-balance').innerText = data.carrier_bank_balance.toLocaleString() + " CR";
-                    document.getElementById('stat-upkeep').innerText = data.calculated_weekly_upkeep.toLocaleString() + " CR";
                     document.getElementById('stat-runway').innerText = data.weeks_remaining_until_debt + " Weeks";
                     document.getElementById('input-threshold').value = data.user_configured_threshold;
-
+                    // Build and refresh calendar timeline blocks 
+                    buildCalendarTimeline(data.weeks_remaining_until_debt, data.user_configured_threshold);
                     const banner = document.getElementById('alert-banner');
                     banner.classList.remove('hidden');
-
                     if (data.alert_tier === "HEALTHY") {
                         banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-emerald-950/30 border-emerald-800 text-emerald-400";
                         document.getElementById('alert-title').innerText = "System Matrix Secure";
                         document.getElementById('alert-icon').innerText = "🛡️";
                     } else if (data.alert_tier === "LOW_FUNDS_ALERT") {
-                        banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-amber-950/30 border-amber-800 text-amber-400";
-                        document.getElementById('alert-title').innerText = "Low Reserve Warning";
+                        banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-amber-950/30 border-amber-800 text-amber-400"
+                        ;document.getElementById('alert-title').innerText = "Low Reserve Warning";
                         document.getElementById('alert-icon').innerText = "⚠️";
                     } else {
                         banner.className = "p-4 rounded-lg border flex items-center space-x-3 bg-rose-950/30 border-rose-800 text-rose-400 animate-pulse";
                         document.getElementById('alert-title').innerText = "CRITICAL DECOMMISSIONING HAZARD";
                         document.getElementById('alert-icon').innerText = "🚨";
-                    }
-                    document.getElementById('alert-text').innerText = data.alert_details;
-
+                    }document.getElementById('alert-text').innerText = data.alert_details;
                     const container = document.getElementById('modules-container');
                     container.innerHTML = "";
-                    Object.entries(data.modules_status).forEach(([name, meta]) => {
-                        let badgeClass = meta.state === "enabled" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
-                                         meta.state === "disabled" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : 
-                                         "bg-slate-800 text-slate-500 border-slate-700";
-
-                        container.innerHTML += `
-                            <div class="flex justify-between items-center p-3 rounded-lg bg-slate-900 border border-slate-800">
-                                <span class="capitalize font-medium text-slate-300">${name}</span>
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${badgeClass}">${meta.state}</span>
-                                    <span class="text-xs font-mono text-slate-500">${meta.cost_cr.toLocaleString()} CR/wk</span>
-                                </div>
-                            </div>`;
+                    calculated_weekly_upkeep = 5_000_000;
+                    Object.entries(MODULE_COSTS).forEach(([name, c]) => {
+                        let meta = data.modules_status[name]??{};
+                        let cost = c[meta.state??'not-installed'];
+                        let badgeClass = meta.state === "enabled" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :meta.state === "disabled" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :"bg-slate-800 text-slate-500 border-slate-700";
+                        calculated_weekly_upkeep+=cost
+                        container.innerHTML +=  `<div class="flex justify-between items-center p-3 rounded-lg bg-slate-900 border border-slate-800"> <span class="capitalize font-medium text-slate-300">${name}</span> <div class="flex items-center space-x-3"> <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${badgeClass}">${meta.state}</span> <span class="text-xs font-mono text-slate-500">${cost.toLocaleString()} CR/wk</span> </div> </div>`;
                     });
-                } catch (err) { console.error(err); }
-            }
-
-            // Handle configuration post back to the server setup engine
-            document.getElementById('config-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const targetWeeks = document.getElementById('input-threshold').value;
-                await fetch('/save-config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ threshold_weeks: parseInt(targetWeeks) })
+                    
+                    document.getElementById('stat-upkeep').innerText = calculated_weekly_upkeep.toLocaleString() + " CR";
+                } catch (err) { console.error(err); }}
+                document.getElementById('config-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const targetWeeks = document.getElementById('input-threshold').value;
+                    await fetch('/save-config', {
+                        method: 'POST',headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ threshold_weeks: parseInt(targetWeeks) })
+                    });
+                    alert("Configuration framework updated successfully!");
+                    syncDashboardData();
                 });
-                alert("Configuration framework updated successfully!");
-                syncDashboardData();
+                syncDashboardData()
             });
 
-            syncDashboardData();
-        });
     </script>
 </body>
 </html>

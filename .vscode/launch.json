@@ -20,6 +20,9 @@
             ],
             "jinja": true,
             "autoStartBrowser": false,
+            //"preLaunchTask": "devfile: pip-install-requirements",
+            "autoReload": {"enable": true},
+            "console": "integratedTerminal"
 
         },
         {
@@ -27,7 +30,14 @@
             "type": "debugpy",
             "request": "launch",
             "program": "scheduler.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "consoleName": "Scheduler Console"
+        },
+        {
+            "name": "install Python requirements",
+            "type": "node-terminal",
+            "command": "pip3 install -r requirements.txt",
+            "request": "launch",
         }
     ]
 }
